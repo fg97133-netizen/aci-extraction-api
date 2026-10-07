@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACI Extraction Demandes Clients</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f3f0;
+      padding: 2rem;
+      margin: 0;
+      color: #2c2a27;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 24px;
+      margin-top: 0;
+      margin-bottom: 2rem;
+    }
+    .section {
+      background: white;
+      border: 1px solid #e0ddd8;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .section-header {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #888;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid #f1efe8;
+      padding-bottom: 0.6rem;
+    }
+    textarea, input, select {
+      font-family: inherit;
+      padding: 12px;
+      border: 1px solid #d3d1c7;
+      border-radius: 4px;
+      font-size: 13px;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    textarea {
+      min-height: 120px;
+      font-family: monospace;
+    }
+    button {
+      padding: 10px 16px;
+      background: #185fa5;
+      color: white;
+      border: 1px solid #185fa5;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #134080;
+    }
+    button.secondary {
+      background: white;
+      color: #2c2a27;
+      border: 1px solid #d3d1c7;
+    }
+    button.secondary:hover {
+      background: #f9f8f6;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      display: none;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 1rem 0;
+      font-size: 13px;
+      border: 1px solid #b5d4f4;
+      background: #e6f1fb;
+      color: #185fa5;
+    }
+    .status.error {
+      background: #fde6e6;
+      border-color: #f4b5b5;
+      color: #a51818;
+    }
+    .hidden {
+      display: none !important;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-top: 1rem;
+    }
+    th {
+      background: #f1efe8;
+      border-bottom: 2px solid #d3d1c7;
+      padding: 8px 6px;
+      text-align: left;
+      font-weight: 600;
+      color: #444;
+    }
+    td {
+      padding: 6px;
+      border-bottom: 1px solid #e0ddd8;
+    }
+    td input {
+      width: 100%;
+      padding: 4px 6px;
+      margin: 0;
+      border: 1px solid #d3d1c7;
+    }
+    .button-group {
+      display: flex;
+      gap: 1rem;
+    }
+    .input-tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid #e0ddd8;
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-weight: 500;
+      color: #888;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: #185fa5;
+      border-bottom-color: #185fa5;
+    }
+    .input-content {
+      display: none;
+    }
+    .input-content.active {
+      display: block;
+    }
+    .drop-zone {
+      border: 2px dashed #d3d1c7;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #fafaf8;
+    }
+    .drop-zone:hover {
+      border-color: #185fa5;
+      background: #f0f7ff;
+    }
+    .drop-zone.dragover {
+      border-color: #185fa5;
+      background: #e6f1fb;
+    }
+    .drop-zone p {
+      margin: 0.5rem 0;
+      color: #666;
+      font-size: 13px;
+    }
+    .file-input-hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>ACI Extraction Demandes Clients</h1>
+
+  <!-- ÉTAPE 1: Importer demande -->
+  <div id="step1" class="section">
+    <div class="section-header">Étape 1 - Importer demande</div>
+
+    <!-- Input method tabs -->
+    <div class="input-tabs">
+      <button class="tab-btn active" onclick="switchTab('text')">Texte</button>
+      <button class="tab-btn" onclick="switchTab('pdf')">PDF</button>
+    </div>
+
+    <!-- Text input tab -->
+    <div id="text-input" class="input-content active">
+      <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.5rem;">Demande client</label>
+      <textarea id="demandInput" placeholder="Collez la demande client ici"></textarea>
+    </div>
+
+    <!-- PDF input tab -->
+    <div id="pdf-input" class="input-content">
+      <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 1rem;">Fichier PDF</label>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfFile').click()">
+        <p style="font-size: 24px;">📄</p>
+        <p style="font-weight: 600;">Déposez votre PDF ici</p>
+        <p>ou cliquez pour parcourir</p>
+      </div>
+      <input type="file" id="pdfFile" class="file-input-hidden" accept=".pdf" onchange="handlePdfSelect()" />
+      <div id="pdfFileName" style="margin-top: 1rem; font-size: 12px; color: #666;"></div>
+    </div>
+
+    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem;">Langue</label>
+    <select id="language" style="margin-bottom: 1rem;">
+      <option value="FR">Français</option>
+      <option value="EN">English</option>
+    </select>
+
+    <div id="status1" class="status"></div>
+
+    <button id="extractBtn" onclick="extraire()">Extraire & matcher</button>
+  </div>
+
+  <!-- ÉTAPE 2: Éditer & exporter -->
+  <div id="step2" class="section hidden">
+    <div class="section-header">Étape 2 - Éditer & exporter</div>
+
+    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.5rem;">Export langue</label>
+    <select id="outputLanguage" style="margin-bottom: 1rem;">
+      <option value="FR">Français</option>
+      <option value="EN">English</option>
+    </select>
+
+    <div id="tableContainer"></div>
+
+    <div id="status2" class="status"></div>
+
+    <div class="button-group" style="margin-top: 1.5rem;">
+      <button id="exportBtn" onclick="exporterExcel()">Télécharger Excel</button>
+      <button class="secondary" onclick="reinitialiser()">Nouvelle demande</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API_URL = "https://web-production-1ee082.up.railway.app";
+  let extractedData = [];
+  let currentTab = 'text';
+
+  function switchTab(tab) {
+    currentTab = tab;
+
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Update content
+    document.getElementById('text-input').classList.toggle('active', tab === 'text');
+    document.getElementById('pdf-input').classList.toggle('active', tab === 'pdf');
+  }
+
+  function handlePdfSelect() {
+    const fileInput = document.getElementById('pdfFile');
+    const fileNameDiv = document.getElementById('pdfFileName');
+
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      fileNameDiv.textContent = `✓ ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    }
+  }
+
+  // Drag and drop handling
+  const dropZone = document.getElementById('dropZone');
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      document.getElementById('pdfFile').files = files;
+      handlePdfSelect();
+    }
+  });
+
+  async function extraire() {
+    const language = document.getElementById('language').value;
+    const status = document.getElementById('status1');
+    const btn = document.getElementById('extractBtn');
+
+    try {
+      showStatus('⏳ Extraction en cours...', 'status1', false);
+      btn.disabled = true;
+
+      let response;
+
+      if (currentTab === 'text') {
+        const demand = document.getElementById('demandInput').value.trim();
+
+        if (!demand) {
+          showStatus('Fournissez une demande', 'status1', true);
+          btn.disabled = false;
+          return;
+        }
+
+        response = await fetch(`${API_URL}/api/extract`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ demand, language })
+        });
+      } else {
+        // PDF extraction
+        const fileInput = document.getElementById('pdfFile');
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+          showStatus('Fournissez un fichier PDF', 'status1', true);
+          btn.disabled = false;
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('language', language);
+
+        response = await fetch(`${API_URL}/api/extract-pdf`, {
+          method: 'POST',
+          body: formData
+        });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur API');
+      }
+
+      const result = await response.json();
+      extractedData = result.data;
+
+      btn.disabled = false;
+      showStatus(`✓ ${extractedData.length} produit(s) extrait(s)`, 'status1', false);
+
+      document.getElementById('step1').classList.add('hidden');
+      document.getElementById('step2').classList.remove('hidden');
+      afficherTableau();
+    } catch (err) {
+      btn.disabled = false;
+      console.error('Erreur:', err);
+      showStatus(`❌ ${err.message}`, 'status1', true);
+    }
+  }
+
+  function afficherTableau() {
+    const lang = document.getElementById('outputLanguage').value;
+    const headers = lang === 'FR'
+      ? ['Réf client', 'Code', 'Famille', 'Désignation', 'Norme', 'Matière', 'Finish', 'Dimensions', 'Longueur', 'Quantité', 'Unité', 'Délai', 'Notes']
+      : ['Ref', 'Code', 'Family', 'Description', 'Standard', 'Material', 'Finish', 'Dimensions', 'Length', 'Qty', 'Unit', 'Lead time', 'Notes'];
+
+    const keys = ['ref_client', 'code_article', 'famille', 'designation', 'norme', 'matiere', 'finish', 'dimensions', 'longueur_ml', 'quantite', 'unite', 'delai', 'notes'];
+
+    let html = '<table><thead><tr>';
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += '</tr></thead><tbody>';
+
+    extractedData.forEach((item, idx) => {
+      html += '<tr>';
+      keys.forEach(key => {
+        const value = item[key] || '';
+        html += `<td><input type="text" value="${value.replace(/"/g, '&quot;')}" data-idx="${idx}" data-key="${key}" onchange="updateData(this)" /></td>`;
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('tableContainer').innerHTML = html;
+  }
+
+  function updateData(el) {
+    const idx = el.dataset.idx;
+    const key = el.dataset.key;
+    extractedData[idx][key] = el.value;
+  }
+
+  async function exporterExcel() {
+    try {
+      if (!extractedData || extractedData.length === 0) {
+        showStatus('Pas de données à exporter', 'status2', true);
+        return;
+      }
+
+      const lang = document.getElementById('outputLanguage').value;
+      const btn = document.getElementById('exportBtn');
+      btn.disabled = true;
+      showStatus('⏳ Génération Excel...', 'status2', false);
+
+      const response = await fetch(`${API_URL}/api/export-excel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: extractedData, language: lang })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur génération Excel');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ACI_Demande_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      btn.disabled = false;
+      showStatus('✓ Excel téléchargé', 'status2', false);
+    } catch (err) {
+      document.getElementById('exportBtn').disabled = false;
+      console.error('Erreur:', err);
+      showStatus(`❌ ${err.message}`, 'status2', true);
+    }
+  }
+
+  function reinitialiser() {
+    document.getElementById('demandInput').value = '';
+    document.getElementById('pdfFile').value = '';
+    document.getElementById('pdfFileName').textContent = '';
+    document.getElementById('step1').classList.remove('hidden');
+    document.getElementById('step2').classList.add('hidden');
+    extractedData = [];
+    document.getElementById('tableContainer').innerHTML = '';
+    document.getElementById('status1').classList.add('hidden');
+    document.getElementById('status2').classList.add('hidden');
+  }
+
+  function showStatus(msg, id, isError) {
+    const status = document.getElementById(id);
+    status.textContent = msg;
+    status.classList.toggle('error', isError);
+    status.classList.remove('hidden');
+  }
+</script>
+
+</body>
+</html>
