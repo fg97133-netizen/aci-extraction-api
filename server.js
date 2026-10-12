@@ -57,7 +57,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -150,7 +150,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -227,6 +227,17 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Pas de données trouvées dans le fichier Excel' });
     }
 
+    // Estimate tokens (1 token ≈ 4 characters)
+    const estimatedTokens = Math.ceil(demand.length / 4);
+    console.log(`Excel file token estimation: ${estimatedTokens} tokens`);
+
+    if (estimatedTokens > 7500) {
+      return res.status(413).json({
+        success: false,
+        error: `Fichier trop volumineux: ${estimatedTokens} tokens estimés (max: 8000 tokens). Réduisez le nombre de feuilles ou les données.`
+      });
+    }
+
     if (!CLAUDE_API_KEY) {
       return res.status(400).json({ success: false, error: 'Clé API non configurée' });
     }
@@ -259,7 +270,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [
         { role: 'user', content: prompt }
       ]
