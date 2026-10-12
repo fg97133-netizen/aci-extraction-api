@@ -56,7 +56,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-opus-4-1',
+      model: 'claude-sonnet-5-5',
       max_tokens: 1500,
       messages: [
         { role: 'user', content: prompt }
@@ -160,7 +160,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-opus-4-1',
+      model: 'claude-sonnet-5-5',
       max_tokens: 1500,
       messages: [
         { role: 'user', content: prompt }
