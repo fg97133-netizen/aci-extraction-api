@@ -29,12 +29,16 @@ app.post('/api/extract', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Demande manquante ou clé API non configurée' });
     }
 
-    const prompt = `EXTRACTION DEMANDE CLIENT
+    const prompt = `EXTRACTION DEMANDE CLIENT - MODE STRICT
+
+Extrais UNIQUEMENT les produits présents dans le fichier/demande fourni.
+N'invente AUCUNE donnée. Si une info manque, laisse le champ vide "".
+Ne modifie pas, ne complète pas, ne devines pas les données manquantes.
 
 Demande (${language}):
 ${demand}
 
-Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après):
+Fournis UNIQUEMENT ce JSON (sans texte avant/après):
 ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - designation, norme, matiere, finish, notes, etc.]' : ''}
 
 [
@@ -57,7 +61,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -122,12 +126,16 @@ app.post('/api/extract-pdf', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Clé API non configurée' });
     }
 
-    const prompt = `EXTRACTION DEMANDE CLIENT
+    const prompt = `EXTRACTION DEMANDE CLIENT - MODE STRICT
+
+Extrais UNIQUEMENT les produits présents dans le fichier/demande fourni.
+N'invente AUCUNE donnée. Si une info manque, laisse le champ vide "".
+Ne modifie pas, ne complète pas, ne devines pas les données manquantes.
 
 Demande (${language}):
 ${demand}
 
-Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après):
+Fournis UNIQUEMENT ce JSON (sans texte avant/après):
 ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - designation, norme, matiere, finish, notes, etc.]' : ''}
 
 [
@@ -150,7 +158,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -246,10 +254,10 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
     const estimatedTokens = Math.ceil(demand.length / 4);
     console.log(`Excel file token estimation: ${estimatedTokens} tokens`);
 
-    if (estimatedTokens > 7500) {
+    if (estimatedTokens > 14000) {
       return res.status(413).json({
         success: false,
-        error: `Fichier trop volumineux: ${estimatedTokens} tokens estimés (max: 8000 tokens). Réduisez le nombre de feuilles ou les données.`
+        error: `Fichier trop volumineux: ${estimatedTokens} tokens estimés (max: 16000 tokens). Réduisez le nombre de feuilles ou les données.`
       });
     }
 
@@ -257,12 +265,16 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Clé API non configurée' });
     }
 
-    const prompt = `EXTRACTION DEMANDE CLIENT
+    const prompt = `EXTRACTION DEMANDE CLIENT - MODE STRICT
+
+Extrais UNIQUEMENT les produits présents dans le fichier/demande fourni.
+N'invente AUCUNE donnée. Si une info manque, laisse le champ vide "".
+Ne modifie pas, ne complète pas, ne devines pas les données manquantes.
 
 Demande (${language}):
 ${demand}
 
-Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après):
+Fournis UNIQUEMENT ce JSON (sans texte avant/après):
 ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - designation, norme, matiere, finish, notes, etc.]' : ''}
 
 [
@@ -285,7 +297,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -349,10 +361,21 @@ app.post('/api/export-excel', async (req, res) => {
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1EFE8' } };
 
-    // Data rows
+    // Data rows with empty cell highlighting in pink
     data.forEach(item => {
       const row = keys.map(key => item[key] || '');
-      worksheet.addRow(row);
+      const worksheetRow = worksheet.addRow(row);
+
+      // Highlight empty cells in light pink
+      worksheetRow.eachCell((cell, colNumber) => {
+        if (!cell.value || cell.value === '') {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFF9FC9' } // Light pink
+          };
+        }
+      });
     });
 
     // Auto-width
