@@ -210,17 +210,32 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Aucune feuille trouvée dans le fichier Excel' });
     }
 
-    // Read ALL worksheets
+    // Read ALL worksheets with robust cell access
     let demand = '';
     workbook.worksheets.forEach((worksheet, sheetIndex) => {
       // Add sheet name as separator (except for first sheet)
       if (sheetIndex > 0) {
         demand += '\n--- Feuille: ' + worksheet.name + ' ---\n';
       }
-      worksheet.eachRow((row, rowNumber) => {
-        const rowData = row.values.slice(1).join('\t'); // Remove first undefined element
-        demand += rowData + '\n';
-      });
+
+      // Iterate through rows using getRow() for better control
+      for (let rowNum = 1; rowNum <= worksheet.rowCount; rowNum++) {
+        const row = worksheet.getRow(rowNum);
+        const rowData = [];
+
+        // Iterate through columns in this row
+        for (let colNum = 1; colNum <= worksheet.columnCount; colNum++) {
+          const cell = row.getCell(colNum);
+          const cellValue = cell.value !== null && cell.value !== undefined ? String(cell.value).trim() : '';
+          rowData.push(cellValue);
+        }
+
+        // Join cells with tab and only add non-empty rows
+        const rowStr = rowData.join('\t').trim();
+        if (rowStr.length > 0) {
+          demand += rowStr + '\n';
+        }
+      }
     });
 
     if (!demand || demand.trim().length === 0) {
@@ -294,10 +309,12 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
+    console.log('Response content (first 500 chars):', content.substring(0, 500));
 
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      return res.status(400).json({ success: false, error: 'JSON non trouvé dans la réponse Claude' });
+      console.log('ERROR: JSON not found. Full response:', content);
+      return res.status(400).json({ success: false, error: 'JSON non trouvé dans la réponse Claude. Check server logs.' });
     }
 
     const extractedData = JSON.parse(jsonMatch[0]);
