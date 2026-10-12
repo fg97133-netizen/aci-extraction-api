@@ -189,7 +189,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
   }
 });
 
-// Extraction from Excel file using ExcelJS
+// Extraction from Excel file using ExcelJS - READ ALL SHEETS
 app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -205,16 +205,22 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
     // Parse Excel file and convert to text using ExcelJS
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
-    const worksheet = workbook.getWorksheet(1);
 
-    if (!worksheet) {
+    if (workbook.worksheets.length === 0) {
       return res.status(400).json({ success: false, error: 'Aucune feuille trouvée dans le fichier Excel' });
     }
 
+    // Read ALL worksheets
     let demand = '';
-    worksheet.eachRow((row, rowNumber) => {
-      const rowData = row.values.slice(1).join('\t'); // Remove first undefined element
-      demand += rowData + '\n';
+    workbook.worksheets.forEach((worksheet, sheetIndex) => {
+      // Add sheet name as separator (except for first sheet)
+      if (sheetIndex > 0) {
+        demand += '\n--- Feuille: ' + worksheet.name + ' ---\n';
+      }
+      worksheet.eachRow((row, rowNumber) => {
+        const rowData = row.values.slice(1).join('\t'); // Remove first undefined element
+        demand += rowData + '\n';
+      });
     });
 
     if (!demand || demand.trim().length === 0) {
