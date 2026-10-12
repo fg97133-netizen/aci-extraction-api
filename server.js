@@ -4,7 +4,6 @@ const axios = require('axios');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
-const XLSX = require('xlsx');
 require('dotenv').config();
 
 const app = express();
@@ -71,32 +70,19 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     });
 
     console.log('=== ANTHROPIC API RESPONSE (TEXT EXTRACT) ===');
-    console.log('Full response:', JSON.stringify(response.data, null, 2));
     console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
-
-    // Vérifier la structure de la réponse
-    if (!response.data || !response.data.content || !Array.isArray(response.data.content)) {
-      console.error('Invalid response structure - missing content array:', response.data);
-      return res.status(400).json({ success: false, error: 'Invalid Anthropic API response structure - missing content array' });
-    }
-
-    if (response.data.content.length === 0) {
-      console.error('Response content array is empty');
-      return res.status(400).json({ success: false, error: 'Anthropic API returned empty content array' });
-    }
 
     // Find text block (handle thinking blocks)
     const textBlock = response.data.content.find(block => block.type === 'text');
     if (!textBlock || !textBlock.text) {
-      console.error('No text in content blocks:', JSON.stringify(response.data.content, null, 2));
+      console.error('No text in content blocks');
       return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
     }
 
     const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
 
-    // Extraire le JSON de la réponse
+    // Extract JSON from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return res.status(400).json({ success: false, error: 'JSON non trouvé dans la réponse Claude' });
@@ -177,32 +163,18 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     });
 
     console.log('=== ANTHROPIC API RESPONSE (PDF EXTRACT) ===');
-    console.log('Full response:', JSON.stringify(response.data, null, 2));
     console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
-
-    // Vérifier la structure de la réponse
-    if (!response.data || !response.data.content || !Array.isArray(response.data.content)) {
-      console.error('Invalid response structure - missing content array:', response.data);
-      return res.status(400).json({ success: false, error: 'Invalid Anthropic API response structure - missing content array' });
-    }
-
-    if (response.data.content.length === 0) {
-      console.error('Response content array is empty');
-      return res.status(400).json({ success: false, error: 'Anthropic API returned empty content array' });
-    }
 
     // Find text block (handle thinking blocks)
     const textBlock = response.data.content.find(block => block.type === 'text');
     if (!textBlock || !textBlock.text) {
-      console.error('No text in content blocks:', JSON.stringify(response.data.content, null, 2));
+      console.error('No text in content blocks');
       return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
     }
 
     const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
 
-    // Extract JSON from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return res.status(400).json({ success: false, error: 'JSON non trouvé dans la réponse Claude' });
@@ -217,25 +189,33 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
   }
 });
 
-// Extraction from Excel file
+// Extraction from Excel file using ExcelJS
 app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Aucun fichier fourni' });
     }
 
-    if (!req.file.mimetype.includes('spreadsheet') && !req.file.originalname.match(/\.(xlsx?|csv)$/i)) {
+    if (!req.file.originalname.match(/\.(xlsx?|csv)$/i)) {
       return res.status(400).json({ success: false, error: 'Le fichier doit être un Excel ou CSV' });
     }
 
     const language = req.body.language || 'FR';
 
-    // Parse Excel file and convert to text
-    const workbook = XLSX.read(req.file.buffer);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_txt(worksheet);
+    // Parse Excel file and convert to text using ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const worksheet = workbook.getWorksheet(1);
 
-    const demand = data;
+    if (!worksheet) {
+      return res.status(400).json({ success: false, error: 'Aucune feuille trouvée dans le fichier Excel' });
+    }
+
+    let demand = '';
+    worksheet.eachRow((row, rowNumber) => {
+      const rowData = row.values.slice(1).join('\t'); // Remove first undefined element
+      demand += rowData + '\n';
+    });
 
     if (!demand || demand.trim().length === 0) {
       return res.status(400).json({ success: false, error: 'Pas de données trouvées dans le fichier Excel' });
@@ -288,11 +268,6 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     console.log('=== ANTHROPIC API RESPONSE (EXCEL EXTRACT) ===');
     console.log('Response status:', response.status);
 
-    if (!response.data || !response.data.content || !Array.isArray(response.data.content)) {
-      console.error('Invalid response structure');
-      return res.status(400).json({ success: false, error: 'Invalid Anthropic API response structure' });
-    }
-
     // Find text block (handle thinking blocks)
     const textBlock = response.data.content.find(block => block.type === 'text');
     if (!textBlock || !textBlock.text) {
@@ -340,7 +315,7 @@ app.post('/api/export-excel', async (req, res) => {
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1EFE8' } };
 
-    // Données
+    // Data rows
     data.forEach(item => {
       const row = keys.map(key => item[key] || '');
       worksheet.addRow(row);
@@ -351,7 +326,7 @@ app.post('/api/export-excel', async (req, res) => {
       col.width = 15;
     });
 
-    // Générer buffer Excel
+    // Generate Excel buffer
     const buffer = await workbook.xlsx.writeBuffer();
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
