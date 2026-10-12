@@ -55,7 +55,7 @@ Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-opus-4-1-20250805',
+      model: 'claude-opus-4-1',
       max_tokens: 2000,
       messages: [
         { role: 'user', content: prompt }
@@ -136,7 +136,7 @@ Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-opus-4-1-20250805',
+      model: 'claude-opus-4-1',
       max_tokens: 2000,
       messages: [
         { role: 'user', content: prompt }
