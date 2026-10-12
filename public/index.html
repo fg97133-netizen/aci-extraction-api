@@ -219,6 +219,97 @@
       font-weight: 500;
       margin: 0;
     }
+    /* Modal styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show {
+      display: flex;
+    }
+    .modal-box {
+      background: white;
+      border-radius: 8px;
+      padding: 2rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 1rem 0;
+      color: #2c2a27;
+    }
+    .preview-box {
+      background: #f9f8f6;
+      border: 1px solid #e0ddd8;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      color: #333;
+    }
+    .preview-box pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .language-selector {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+      justify-content: center;
+    }
+    .lang-btn {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid #d3d1c7;
+      border-radius: 4px;
+      background: white;
+      color: #2c2a27;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+      max-width: 120px;
+    }
+    .lang-btn:hover:not(:disabled) {
+      background: #f0f7ff;
+      border-color: #185fa5;
+      color: #185fa5;
+    }
+    .lang-btn.primary {
+      background: #185fa5;
+      color: white;
+      border-color: #185fa5;
+    }
+    .lang-btn.primary:hover {
+      background: #134080;
+    }
+    .lang-btn.cancel {
+      border-color: #d3d1c7;
+    }
+    .lang-btn.cancel:hover {
+      background: #f5f3f0;
+    }
+    .lang-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -267,12 +358,6 @@
       <div id="excelFileName" style="margin-top: 1rem; font-size: 12px; color: #666;"></div>
     </div>
 
-    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem;">Langue</label>
-    <select id="language" style="margin-bottom: 1rem;">
-      <option value="FR">Français</option>
-      <option value="EN">English</option>
-    </select>
-
     <div id="status1" class="status"></div>
 
     <button id="extractBtn" onclick="extraire()">Extraire & matcher</button>
@@ -304,8 +389,23 @@
 <div id="loaderOverlay" class="loader-overlay">
   <div class="loader-box">
     <div class="spinner"></div>
-    <p class="loader-text">Traitement du fichier en cours...</p>
+    <p class="loader-text">Traitement du PDF en cours...</p>
     <p style="font-size: 12px; color: #888; margin-top: 0.5rem;">Veuillez patienter</p>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="previewModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 class="modal-title">Aperçu de l'extraction (5 premiers éléments)</h3>
+    <div class="preview-box">
+      <pre id="previewContent">Chargement...</pre>
+    </div>
+    <div class="language-selector">
+      <button class="lang-btn cancel" onclick="closePreviewModal()">Annuler</button>
+      <button class="lang-btn primary" onclick="completeExtraction('FR')">Français</button>
+      <button class="lang-btn primary" onclick="completeExtraction('EN')">English</button>
+    </div>
   </div>
 </div>
 
@@ -313,6 +413,10 @@
   const API_URL = "https://web-production-1ee082.up.railway.app";
   let extractedData = [];
   let currentTab = 'text';
+  let previewPending = {
+    demand: null,
+    fileType: null
+  };
 
   function switchTab(tab) {
     currentTab = tab;
@@ -403,32 +507,26 @@
   }
 
   async function extraire() {
-    const language = document.getElementById('language').value;
     const status = document.getElementById('status1');
     const btn = document.getElementById('extractBtn');
 
     try {
-      showStatus('⏳ Extraction en cours...', 'status1', false);
+      showStatus('⏳ Génération aperçu...', 'status1', false);
       btn.disabled = true;
 
-      let response;
+      let demand = null;
+      let fileType = null;
 
       if (currentTab === 'text') {
-        const demand = document.getElementById('demandInput').value.trim();
+        demand = document.getElementById('demandInput').value.trim();
 
         if (!demand) {
           showStatus('Fournissez une demande', 'status1', true);
           btn.disabled = false;
           return;
         }
-
-        response = await fetch(`${API_URL}/api/extract`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ demand, language })
-        });
+        fileType = 'text';
       } else if (currentTab === 'pdf') {
-        // PDF extraction - show loader
         const fileInput = document.getElementById('pdfFile');
 
         if (!fileInput.files || fileInput.files.length === 0) {
@@ -439,16 +537,31 @@
 
         showLoader(true);
 
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('language', language);
+        // Parse PDF to get text
+        const pdfBuffer = await fileInput.files[0].arrayBuffer();
+        const formDataForPreview = new FormData();
+        formDataForPreview.append('file', fileInput.files[0]);
+        formDataForPreview.append('language', 'FR'); // Preview always in FR
 
-        response = await fetch(`${API_URL}/api/extract-pdf`, {
+        const pdfResponse = await fetch(`${API_URL}/api/extract-pdf`, {
           method: 'POST',
-          body: formData
+          body: formDataForPreview
         });
+
+        if (!pdfResponse.ok) {
+          const error = await pdfResponse.json();
+          throw new Error(error.error || 'Erreur extraction PDF');
+        }
+
+        const pdfResult = await pdfResponse.json();
+        extractedData = pdfResult.data;
+
+        showLoader(false);
+        btn.disabled = false;
+        showPreviewModal(extractedData);
+        return;
+
       } else if (currentTab === 'excel') {
-        // Excel extraction - show loader
         const fileInput = document.getElementById('excelFile');
 
         if (!fileInput.files || fileInput.files.length === 0) {
@@ -459,6 +572,118 @@
 
         showLoader(true);
 
+        const formDataForPreview = new FormData();
+        formDataForPreview.append('file', fileInput.files[0]);
+        formDataForPreview.append('language', 'FR'); // Preview always in FR
+
+        const excelResponse = await fetch(`${API_URL}/api/extract-excel`, {
+          method: 'POST',
+          body: formDataForPreview
+        });
+
+        if (!excelResponse.ok) {
+          const error = await excelResponse.json();
+          throw new Error(error.error || 'Erreur extraction Excel');
+        }
+
+        const excelResult = await excelResponse.json();
+        extractedData = excelResult.data;
+
+        showLoader(false);
+        btn.disabled = false;
+        showPreviewModal(extractedData);
+        return;
+      }
+
+      // For text input, show preview modal
+      if (fileType === 'text') {
+        showStatus('', 'status1', false); // Clear status
+        previewPending.demand = demand;
+        previewPending.fileType = fileType;
+
+        try {
+          const previewResponse = await fetch(`${API_URL}/api/extract-preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ demand, fileType: 'text', language: 'FR' })
+          });
+
+          if (previewResponse.ok) {
+            const previewResult = await previewResponse.json();
+            extractedData = previewResult.data;
+            showPreviewModal(extractedData);
+          } else {
+            throw new Error('Erreur lors de la génération du prévu');
+          }
+        } catch (err) {
+          throw err;
+        }
+      }
+
+      btn.disabled = false;
+    } catch (err) {
+      btn.disabled = false;
+      showLoader(false);
+      console.error('Erreur:', err);
+      showStatus(`❌ ${err.message}`, 'status1', true);
+    }
+  }
+
+  function showPreviewModal(data) {
+    const previewContent = document.getElementById('previewContent');
+    const preview = data.slice(0, 5); // Show only first 5 items
+
+    let jsonStr = JSON.stringify(preview, null, 2);
+    // Limit preview to 500 chars for readability
+    if (jsonStr.length > 500) {
+      jsonStr = jsonStr.substring(0, 500) + '...';
+    }
+
+    previewContent.textContent = jsonStr;
+
+    const modal = document.getElementById('previewModal');
+    modal.classList.add('show');
+  }
+
+  function closePreviewModal() {
+    const modal = document.getElementById('previewModal');
+    modal.classList.remove('show');
+    document.getElementById('extractBtn').disabled = false;
+    document.getElementById('status1').classList.add('hidden');
+  }
+
+  async function completeExtraction(language) {
+    const modal = document.getElementById('previewModal');
+    const status = document.getElementById('status1');
+    const btn = document.getElementById('extractBtn');
+
+    try {
+      modal.classList.remove('show');
+      showStatus('⏳ Extraction complète en cours...', 'status1', false);
+      btn.disabled = true;
+
+      let response;
+
+      if (currentTab === 'text') {
+        const demand = previewPending.demand;
+
+        response = await fetch(`${API_URL}/api/extract`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ demand, language })
+        });
+      } else if (currentTab === 'pdf') {
+        const fileInput = document.getElementById('pdfFile');
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('language', language);
+
+        response = await fetch(`${API_URL}/api/extract-pdf`, {
+          method: 'POST',
+          body: formData
+        });
+      } else if (currentTab === 'excel') {
+        const fileInput = document.getElementById('excelFile');
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
         formData.append('language', language);
@@ -478,17 +703,17 @@
       extractedData = result.data;
 
       btn.disabled = false;
-      showLoader(false);
       showStatus(`✓ ${extractedData.length} produit(s) extrait(s)`, 'status1', false);
 
       document.getElementById('step1').classList.add('hidden');
       document.getElementById('step2').classList.remove('hidden');
+      document.getElementById('outputLanguage').value = language;
       afficherTableau();
     } catch (err) {
       btn.disabled = false;
-      showLoader(false);
       console.error('Erreur:', err);
       showStatus(`❌ ${err.message}`, 'status1', true);
+      modal.classList.add('show');
     }
   }
 
