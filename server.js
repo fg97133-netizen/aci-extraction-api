@@ -60,7 +60,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-sonnet-5-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 16000,
       messages: [
         { role: 'user', content: prompt }
@@ -157,7 +157,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-sonnet-5-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 16000,
       messages: [
         { role: 'user', content: prompt }
@@ -296,7 +296,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 ]`;
 
     const response = await axios.post(CLAUDE_API_URL, {
-      model: 'claude-sonnet-5-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 16000,
       messages: [
         { role: 'user', content: prompt }
