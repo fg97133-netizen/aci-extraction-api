@@ -71,7 +71,6 @@ Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après
     console.log('=== ANTHROPIC API RESPONSE (TEXT EXTRACT) ===');
     console.log('Full response:', JSON.stringify(response.data, null, 2));
     console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
 
     // Vérifier la structure de la réponse
     if (!response.data || !response.data.content || !Array.isArray(response.data.content)) {
@@ -84,12 +83,15 @@ Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après
       return res.status(400).json({ success: false, error: 'Anthropic API returned empty content array' });
     }
 
-    if (!response.data.content[0].text) {
-      console.error('No text in first content block:', JSON.stringify(response.data.content[0], null, 2));
+    // Chercher le premier bloc de type "text" (pas "thinking")
+    const textBlock = response.data.content.find(block => block.type === 'text');
+    
+    if (!textBlock || !textBlock.text) {
+      console.error('No text block found in response:', JSON.stringify(response.data.content, null, 2));
       return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
     }
 
-    const content = response.data.content[0].text;
+    const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
 
     // Extraire le JSON de la réponse
@@ -171,7 +173,31 @@ Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après
       }
     });
 
-    const content = response.data.content[0].text;
+    console.log('=== ANTHROPIC API RESPONSE (PDF EXTRACT) ===');
+    console.log('Full response:', JSON.stringify(response.data, null, 2));
+    console.log('Response status:', response.status);
+
+    // Vérifier la structure de la réponse
+    if (!response.data || !response.data.content || !Array.isArray(response.data.content)) {
+      console.error('Invalid response structure - missing content array:', response.data);
+      return res.status(400).json({ success: false, error: 'Invalid Anthropic API response structure - missing content array' });
+    }
+
+    if (response.data.content.length === 0) {
+      console.error('Response content array is empty');
+      return res.status(400).json({ success: false, error: 'Anthropic API returned empty content array' });
+    }
+
+    // Chercher le premier bloc de type "text" (pas "thinking")
+    const textBlock = response.data.content.find(block => block.type === 'text');
+    
+    if (!textBlock || !textBlock.text) {
+      console.error('No text block found in response:', JSON.stringify(response.data.content, null, 2));
+      return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
+    }
+
+    const content = textBlock.text;
+    console.log('Extracted text content length:', content.length);
 
     // Extract JSON from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
