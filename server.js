@@ -85,12 +85,14 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
       return res.status(400).json({ success: false, error: 'Anthropic API returned empty content array' });
     }
 
-    if (!response.data.content[0].text) {
-      console.error('No text in first content block:', JSON.stringify(response.data.content[0], null, 2));
+    // Find text block (handle thinking blocks)
+    const textBlock = response.data.content.find(block => block.type === 'text');
+    if (!textBlock || !textBlock.text) {
+      console.error('No text in content blocks:', JSON.stringify(response.data.content, null, 2));
       return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
     }
 
-    const content = response.data.content[0].text;
+    const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
 
     // Extraire le JSON de la réponse
@@ -189,12 +191,14 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
       return res.status(400).json({ success: false, error: 'Anthropic API returned empty content array' });
     }
 
-    if (!response.data.content[0].text) {
-      console.error('No text in first content block:', JSON.stringify(response.data.content[0], null, 2));
+    // Find text block (handle thinking blocks)
+    const textBlock = response.data.content.find(block => block.type === 'text');
+    if (!textBlock || !textBlock.text) {
+      console.error('No text in content blocks:', JSON.stringify(response.data.content, null, 2));
       return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
     }
 
-    const content = response.data.content[0].text;
+    const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
 
     // Extract JSON from response
