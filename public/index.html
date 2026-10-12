@@ -730,7 +730,7 @@
 
     try {
       modal.classList.remove('show');
-      showStatus('⏳ Extraction complète en cours...', 'status1', false);
+      showLoader(true);
       btn.disabled = true;
 
       let response;
@@ -773,6 +773,7 @@
       const result = await response.json();
       extractedData = result.data;
 
+      showLoader(false);
       btn.disabled = false;
       showStatus(`✓ ${extractedData.length} produit(s) extrait(s)`, 'status1', false);
 
@@ -781,6 +782,7 @@
       document.getElementById('outputLanguage').value = language;
       afficherTableau();
     } catch (err) {
+      showLoader(false);
       btn.disabled = false;
       console.error('Erreur:', err);
       showStatus(`❌ ${err.message}`, 'status1', true);
