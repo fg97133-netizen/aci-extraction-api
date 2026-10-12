@@ -234,6 +234,7 @@
     <div class="input-tabs">
       <button class="tab-btn active" onclick="switchTab('text')">Texte</button>
       <button class="tab-btn" onclick="switchTab('pdf')">PDF</button>
+      <button class="tab-btn" onclick="switchTab('excel')">Excel</button>
     </div>
 
     <!-- Text input tab -->
@@ -252,6 +253,18 @@
       </div>
       <input type="file" id="pdfFile" class="file-input-hidden" accept=".pdf" onchange="handlePdfSelect()" />
       <div id="pdfFileName" style="margin-top: 1rem; font-size: 12px; color: #666;"></div>
+    </div>
+
+    <!-- Excel input tab -->
+    <div id="excel-input" class="input-content">
+      <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 1rem;">Fichier Excel</label>
+      <div class="drop-zone" id="excelDropZone" onclick="document.getElementById('excelFile').click()">
+        <p style="font-size: 24px;">📊</p>
+        <p style="font-weight: 600;">Déposez votre Excel ici</p>
+        <p>ou cliquez pour parcourir</p>
+      </div>
+      <input type="file" id="excelFile" class="file-input-hidden" accept=".xlsx,.xls,.csv" onchange="handleExcelSelect()" />
+      <div id="excelFileName" style="margin-top: 1rem; font-size: 12px; color: #666;"></div>
     </div>
 
     <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem;">Langue</label>
@@ -311,6 +324,7 @@
     // Update content
     document.getElementById('text-input').classList.toggle('active', tab === 'text');
     document.getElementById('pdf-input').classList.toggle('active', tab === 'pdf');
+    document.getElementById('excel-input').classList.toggle('active', tab === 'excel');
   }
 
   function handlePdfSelect() {
@@ -320,6 +334,16 @@
     if (fileInput.files.length > 0) {
       const file = fileInput.files[0];
       fileNameDiv.textContent = `✓ ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    }
+  }
+
+  function handleExcelSelect() {
+    const fileInput = document.getElementById('excelFile');
+    const fileNameDiv = document.getElementById('excelFileName');
+
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      fileNameDiv.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
     }
   }
 
@@ -343,6 +367,29 @@
     if (files.length > 0) {
       document.getElementById('pdfFile').files = files;
       handlePdfSelect();
+    }
+  });
+
+  // Drag and drop for Excel
+  const excelDropZone = document.getElementById('excelDropZone');
+
+  excelDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    excelDropZone.classList.add('dragover');
+  });
+
+  excelDropZone.addEventListener('dragleave', () => {
+    excelDropZone.classList.remove('dragover');
+  });
+
+  excelDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    excelDropZone.classList.remove('dragover');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      document.getElementById('excelFile').files = files;
+      handleExcelSelect();
     }
   });
 
@@ -380,7 +427,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ demand, language })
         });
-      } else {
+      } else if (currentTab === 'pdf') {
         // PDF extraction - show loader
         const fileInput = document.getElementById('pdfFile');
 
@@ -397,6 +444,26 @@
         formData.append('language', language);
 
         response = await fetch(`${API_URL}/api/extract-pdf`, {
+          method: 'POST',
+          body: formData
+        });
+      } else if (currentTab === 'excel') {
+        // Excel extraction - show loader
+        const fileInput = document.getElementById('excelFile');
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+          showStatus('Fournissez un fichier Excel', 'status1', true);
+          btn.disabled = false;
+          return;
+        }
+
+        showLoader(true);
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('language', language);
+
+        response = await fetch(`${API_URL}/api/extract-excel`, {
           method: 'POST',
           body: formData
         });
@@ -501,6 +568,8 @@
     document.getElementById('demandInput').value = '';
     document.getElementById('pdfFile').value = '';
     document.getElementById('pdfFileName').textContent = '';
+    document.getElementById('excelFile').value = '';
+    document.getElementById('excelFileName').textContent = '';
     document.getElementById('step1').classList.remove('hidden');
     document.getElementById('step2').classList.add('hidden');
     extractedData = [];
