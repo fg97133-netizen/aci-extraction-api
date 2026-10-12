@@ -20,6 +20,78 @@ const upload = multer({
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 
+// Preview extraction (5 lines) - shared function
+async function extractPreview(demand, language) {
+  const prompt = `EXTRACTION DEMANDE CLIENT
+
+Demande (${language}):
+${demand}
+
+Extrais UNIQUEMENT les 5 premiers produits et fournis UNIQUEMENT ce JSON (sans texte avant/après):
+${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - designation, norme, matiere, finish, notes, etc.]' : ''}
+
+[
+  {
+    "ref_client": "",
+    "code_article": "",
+    "famille": "TUBES/BOBINES/LAMINE/POUTRELLES/RAB/TOLE/TREILLIS/autre",
+    "designation": "",
+    "norme": "",
+    "matiere": "Acier/Inox/Alu/autre",
+    "finish": "",
+    "dimensions": "",
+    "longueur_ml": "",
+    "quantite": "",
+    "unite": "T/pcs/ML",
+    "delai": "",
+    "notes": ""
+  }
+]`;
+
+  const response = await axios.post(CLAUDE_API_URL, {
+    model: 'claude-haiku-5-5',
+    max_tokens: 8000,
+    messages: [
+      { role: 'user', content: prompt }
+    ]
+  }, {
+    headers: {
+      'x-api-key': CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    }
+  });
+
+  const textBlock = response.data.content.find(block => block.type === 'text');
+  if (!textBlock || !textBlock.text) {
+    throw new Error('No text content in Anthropic API response');
+  }
+
+  const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error('JSON not found in response');
+  }
+
+  return JSON.parse(jsonMatch[0]);
+}
+
+// Preview endpoint (5 lines preview)
+app.post('/api/extract-preview', async (req, res) => {
+  try {
+    const { demand, fileType, language } = req.body;
+
+    if (!demand || !CLAUDE_API_KEY) {
+      return res.status(400).json({ success: false, error: 'Demande manquante ou clé API non configurée' });
+    }
+
+    const previewData = await extractPreview(demand, language || 'FR');
+    res.json({ success: true, data: previewData });
+  } catch (err) {
+    console.error('Erreur preview:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Extraction demande client via Claude API
 app.post('/api/extract', async (req, res) => {
   try {
