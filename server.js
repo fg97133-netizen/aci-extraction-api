@@ -4,6 +4,7 @@ const axios = require('axios');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
+const XLSX = require('xlsx');
 require('dotenv').config();
 
 const app = express();
@@ -57,7 +58,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 1500,
+      max_tokens: 4000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -163,7 +164,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-sonnet-5-5',
-      max_tokens: 1500,
+      max_tokens: 4000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -212,6 +213,106 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     res.json({ success: true, data: extractedData });
   } catch (err) {
     console.error('Erreur extraction PDF:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Extraction from Excel file
+app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Aucun fichier fourni' });
+    }
+
+    if (!req.file.mimetype.includes('spreadsheet') && !req.file.originalname.match(/\.(xlsx?|csv)$/i)) {
+      return res.status(400).json({ success: false, error: 'Le fichier doit être un Excel ou CSV' });
+    }
+
+    const language = req.body.language || 'FR';
+
+    // Parse Excel file and convert to text
+    const workbook = XLSX.read(req.file.buffer);
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_txt(worksheet);
+
+    const demand = data;
+
+    if (!demand || demand.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Pas de données trouvées dans le fichier Excel' });
+    }
+
+    if (!CLAUDE_API_KEY) {
+      return res.status(400).json({ success: false, error: 'Clé API non configurée' });
+    }
+
+    const prompt = `EXTRACTION DEMANDE CLIENT
+
+Demande (${language}):
+${demand}
+
+Extrais tous les produits et fournis UNIQUEMENT ce JSON (sans texte avant/après):
+${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - designation, norme, matiere, finish, notes, etc.]' : ''}
+
+[
+  {
+    "ref_client": "",
+    "code_article": "",
+    "famille": "TUBES/BOBINES/LAMINE/POUTRELLES/RAB/TOLE/TREILLIS/autre",
+    "designation": "",
+    "norme": "",
+    "matiere": "Acier/Inox/Alu/autre",
+    "finish": "",
+    "dimensions": "",
+    "longueur_ml": "",
+    "quantite": "",
+    "unite": "T/pcs/ML",
+    "delai": "",
+    "notes": ""
+  }
+]`;
+
+    const response = await axios.post(CLAUDE_API_URL, {
+      model: 'claude-sonnet-5-5',
+      max_tokens: 4000,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    }, {
+      headers: {
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      }
+    });
+
+    console.log('=== ANTHROPIC API RESPONSE (EXCEL EXTRACT) ===');
+    console.log('Response status:', response.status);
+
+    if (!response.data || !response.data.content || !Array.isArray(response.data.content)) {
+      console.error('Invalid response structure');
+      return res.status(400).json({ success: false, error: 'Invalid Anthropic API response structure' });
+    }
+
+    // Find text block (handle thinking blocks)
+    const textBlock = response.data.content.find(block => block.type === 'text');
+    if (!textBlock || !textBlock.text) {
+      console.error('No text in content blocks');
+      return res.status(400).json({ success: false, error: 'No text content in Anthropic API response' });
+    }
+
+    const content = textBlock.text;
+    console.log('Extracted text content length:', content.length);
+
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      return res.status(400).json({ success: false, error: 'JSON non trouvé dans la réponse Claude' });
+    }
+
+    const extractedData = JSON.parse(jsonMatch[0]);
+
+    res.json({ success: true, data: extractedData });
+  } catch (err) {
+    console.error('Erreur extraction Excel:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
