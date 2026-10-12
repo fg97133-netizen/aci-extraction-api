@@ -61,7 +61,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-haiku-5-5',
-      max_tokens: 16000,
+      max_tokens: 32000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -158,7 +158,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-haiku-5-5',
-      max_tokens: 16000,
+      max_tokens: 32000,
       messages: [
         { role: 'user', content: prompt }
       ]
@@ -254,10 +254,10 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
     const estimatedTokens = Math.ceil(demand.length / 4);
     console.log(`Excel file token estimation: ${estimatedTokens} tokens`);
 
-    if (estimatedTokens > 14000) {
+    if (estimatedTokens > 28000) {
       return res.status(413).json({
         success: false,
-        error: `Fichier trop volumineux: ${estimatedTokens} tokens estimés (max: 16000 tokens). Réduisez le nombre de feuilles ou les données.`
+        error: `Fichier trop volumineux: ${estimatedTokens} tokens estimés (max: 32000 tokens). Réduisez le nombre de feuilles ou les données.`
       });
     }
 
@@ -297,7 +297,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const response = await axios.post(CLAUDE_API_URL, {
       model: 'claude-haiku-5-5',
-      max_tokens: 16000,
+      max_tokens: 32000,
       messages: [
         { role: 'user', content: prompt }
       ]
