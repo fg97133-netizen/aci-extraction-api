@@ -251,22 +251,47 @@
       margin: 0 0 1rem 0;
       color: #2c2a27;
     }
-    .preview-box {
-      background: #f9f8f6;
-      border: 1px solid #e0ddd8;
-      border-radius: 6px;
-      padding: 1rem;
+    .preview-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
       margin-bottom: 2rem;
-      font-family: monospace;
-      font-size: 12px;
-      max-height: 300px;
+      max-height: 350px;
       overflow-y: auto;
-      color: #333;
     }
-    .preview-box pre {
-      margin: 0;
-      white-space: pre-wrap;
+    .preview-item {
+      background: white;
+      border: 1px solid #e0ddd8;
+      border-radius: 4px;
+      padding: 0.75rem;
+      font-size: 12px;
+    }
+    .preview-item-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .preview-item-row:last-child {
+      margin-bottom: 0;
+    }
+    .preview-field {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .preview-label {
+      font-weight: 600;
+      color: #888;
+      min-width: 80px;
+    }
+    .preview-value {
+      color: #2c2a27;
       word-break: break-word;
+      flex: 1;
+    }
+    .preview-value.empty {
+      color: #ccc;
+      font-style: italic;
     }
     .language-selector {
       display: flex;
@@ -397,9 +422,9 @@
 <!-- Preview Modal -->
 <div id="previewModal" class="modal-overlay">
   <div class="modal-box">
-    <h3 class="modal-title">Aperçu de l'extraction (5 premiers éléments)</h3>
-    <div class="preview-box">
-      <pre id="previewContent">Chargement...</pre>
+    <h3 class="modal-title">Aperçu de l'extraction</h3>
+    <div class="preview-items" id="previewContent">
+      <p style="text-align: center; color: #888;">Chargement...</p>
     </div>
     <div class="language-selector">
       <button class="lang-btn cancel" onclick="closePreviewModal()">Annuler</button>
@@ -633,13 +658,59 @@
     const previewContent = document.getElementById('previewContent');
     const preview = data.slice(0, 5); // Show only first 5 items
 
-    let jsonStr = JSON.stringify(preview, null, 2);
-    // Limit preview to 500 chars for readability
-    if (jsonStr.length > 500) {
-      jsonStr = jsonStr.substring(0, 500) + '...';
-    }
+    let html = '';
+    preview.forEach((item, idx) => {
+      html += `<div class="preview-item">`;
+      html += `<div style="font-weight: 600; color: #185fa5; margin-bottom: 0.5rem;">Produit ${idx + 1}</div>`;
+      html += `<div class="preview-item-row">`;
 
-    previewContent.textContent = jsonStr;
+      // Row 1: Code, Famille
+      html += `<div class="preview-field">`;
+      html += `<span class="preview-label">Code:</span>`;
+      html += `<span class="preview-value ${!item.code_article ? 'empty' : ''}">${item.code_article || '—'}</span>`;
+      html += `</div>`;
+      html += `<div class="preview-field">`;
+      html += `<span class="preview-label">Famille:</span>`;
+      html += `<span class="preview-value ${!item.famille ? 'empty' : ''}">${item.famille || '—'}</span>`;
+      html += `</div>`;
+
+      html += `</div><div class="preview-item-row">`;
+
+      // Row 2: Désignation
+      html += `<div class="preview-field" style="grid-column: 1/-1;">`;
+      html += `<span class="preview-label">Désignation:</span>`;
+      html += `<span class="preview-value ${!item.designation ? 'empty' : ''}">${item.designation || '—'}</span>`;
+      html += `</div>`;
+
+      html += `</div><div class="preview-item-row">`;
+
+      // Row 3: Matière, Norme
+      html += `<div class="preview-field">`;
+      html += `<span class="preview-label">Matière:</span>`;
+      html += `<span class="preview-value ${!item.matiere ? 'empty' : ''}">${item.matiere || '—'}</span>`;
+      html += `</div>`;
+      html += `<div class="preview-field">`;
+      html += `<span class="preview-label">Norme:</span>`;
+      html += `<span class="preview-value ${!item.norme ? 'empty' : ''}">${item.norme || '—'}</span>`;
+      html += `</div>`;
+
+      html += `</div><div class="preview-item-row">`;
+
+      // Row 4: Quantité, Unité
+      html += `<div class="preview-field">`;
+      html += `<span class="preview-label">Quantité:</span>`;
+      html += `<span class="preview-value ${!item.quantite ? 'empty' : ''}">${item.quantite || '—'}</span>`;
+      html += `</div>`;
+      html += `<div class="preview-field">`;
+      html += `<span class="preview-label">Unité:</span>`;
+      html += `<span class="preview-value ${!item.unite ? 'empty' : ''}">${item.unite || '—'}</span>`;
+      html += `</div>`;
+
+      html += `</div>`;
+      html += `</div>`;
+    });
+
+    previewContent.innerHTML = html;
 
     const modal = document.getElementById('previewModal');
     modal.classList.add('show');
