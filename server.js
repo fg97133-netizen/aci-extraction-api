@@ -420,10 +420,11 @@ app.post('/api/export-excel', async (req, res) => {
     }
 
     const headers = language === 'FR'
-      ? ['Réf client', 'Code', 'Famille', 'Désignation', 'Norme', 'Matière', 'Finish', 'Dimensions', 'Longueur', 'Quantité', 'Unité', 'Délai', 'Notes']
-      : ['Ref', 'Code', 'Family', 'Description', 'Standard', 'Material', 'Finish', 'Dimensions', 'Length', 'Qty', 'Unit', 'Lead time', 'Notes'];
+      ? ['Réf client', 'Code', 'Famille', 'Désignation', 'Norme', 'Matière', 'Finish', 'Dimensions', 'Longueur', 'Quantité', 'Unité', 'Délai', 'Notes', 'Prix FOB', 'Prix CFR', 'Délai livr.', 'Emballage', 'Commentaires']
+      : ['Ref', 'Code', 'Family', 'Description', 'Standard', 'Material', 'Finish', 'Dimensions', 'Length', 'Qty', 'Unit', 'Lead time', 'Notes', 'FOB Price', 'CFR Price', 'Delivery time', 'Packing', 'Comments'];
 
     const keys = ['ref_client', 'code_article', 'famille', 'designation', 'norme', 'matiere', 'finish', 'dimensions', 'longueur_ml', 'quantite', 'unite', 'delai', 'notes'];
+    const editableColIndices = [13, 14, 15, 16, 17]; // Columns for FOB Price, CFR Price, Delivery time, Packing, Comments (0-indexed)
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Demande');
@@ -433,26 +434,69 @@ app.post('/api/export-excel', async (req, res) => {
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1EFE8' } };
 
-    // Data rows with empty cell highlighting in pink
-    data.forEach(item => {
+    // Data rows
+    data.forEach((item, rowIdx) => {
       const row = keys.map(key => item[key] || '');
+      // Add empty cells for editable columns
+      row.push('', '', '', '', '');
+
       const worksheetRow = worksheet.addRow(row);
 
-      // Highlight empty cells in light pink
+      // Highlight empty cells in light pink (only for data columns, not editable ones)
       worksheetRow.eachCell((cell, colNumber) => {
-        if (!cell.value || cell.value === '') {
+        const colIdx = colNumber - 1;
+
+        // Yellow background for editable columns (supplier input)
+        if (editableColIndices.includes(colIdx)) {
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FFFF9FC9' } // Light pink
+            fgColor: { argb: 'FFFFFF00' } // Yellow
           };
+          cell.locked = false; // Unlock for supplier
+        } else {
+          // Light pink for empty data cells
+          if (!cell.value || cell.value === '') {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFF9FC9' } // Light pink
+            };
+          }
+          cell.locked = true; // Lock for protection
         }
       });
     });
 
-    // Auto-width
-    worksheet.columns.forEach(col => {
-      col.width = 15;
+    // Set column widths
+    const colWidths = [12, 12, 14, 20, 15, 15, 12, 15, 12, 10, 8, 12, 15, 12, 12, 12, 12, 15];
+    worksheet.columns.forEach((col, idx) => {
+      col.width = colWidths[idx] || 15;
+    });
+
+    // Hide first 3 columns (Ref, Code, Family)
+    worksheet.getColumn(1).hidden = true;
+    worksheet.getColumn(2).hidden = true;
+    worksheet.getColumn(3).hidden = true;
+
+    // Lock sheet with protection
+    worksheet.protect('', {
+      sheet: true,
+      content: true,
+      objects: true,
+      scenarios: true,
+      formatRows: false,
+      formatColumns: false,
+      formatCells: false,
+      insertRows: false,
+      insertColumns: false,
+      deleteRows: false,
+      deleteColumns: false,
+      sort: false,
+      autoFilter: false,
+      pivotTables: false,
+      selectLockedCells: true,
+      selectUnlockedCells: true
     });
 
     // Generate Excel buffer
