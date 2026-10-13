@@ -509,21 +509,19 @@ app.post('/api/export-excel', async (req, res) => {
         // Yellow background for editable columns
         if (editableColIndices.includes(colIdx)) {
           cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFFFFF00' } // Yellow
+            type: 'solid',
+            fgColor: { rgb: 'FFFF00' } // Yellow
           };
-          cell.locked = false; // Unlock for supplier
+          cell.protection = { locked: false }; // Unlock for supplier
         } else {
           // Light pink for empty data cells
           if (!cell.value || cell.value === '') {
             cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFFF9FC9' } // Light pink
+              type: 'solid',
+              fgColor: { rgb: 'FFC7CE' } // Light pink
             };
           }
-          cell.locked = true; // Lock for protection
+          cell.protection = { locked: true }; // Lock for protection
         }
       });
     });
