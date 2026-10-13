@@ -448,7 +448,6 @@ app.post('/api/export-excel', async (req, res) => {
         if (cell.alignment) newCell.alignment = Object.assign({}, cell.alignment);
         if (cell.numFmt) newCell.numFmt = cell.numFmt;
 
-        newCell.locked = true; // Template rows are locked
       });
     }
 
@@ -525,14 +524,6 @@ app.post('/api/export-excel', async (req, res) => {
         }
       });
     });
-
-    // Protect rows 1-14 (template rows)
-    for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
-      const row = worksheet.getRow(rowIdx);
-      row.eachCell((cell) => {
-        cell.locked = true; // All cells in rows 1-14 are locked
-      });
-    }
 
     // Lock sheet with strict protection - only allow selecting unlocked cells
     worksheet.protect('123', {
