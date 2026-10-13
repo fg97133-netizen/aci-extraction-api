@@ -413,40 +413,100 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 // Export Excel
 app.post('/api/export-excel', async (req, res) => {
   try {
+    const path = require('path');
+    const fs = require('fs');
     const { data, language } = req.body;
 
     if (!Array.isArray(data)) {
       return res.status(400).json({ success: false, error: 'Données invalides' });
     }
 
-    const headers = language === 'FR'
-      ? ['Réf client', 'Code', 'Famille', 'Désignation', 'Norme', 'Matière', 'Finish', 'Dimensions', 'Longueur', 'Quantité', 'Unité', 'Délai', 'Notes', 'Prix FOB', 'Prix CFR', 'Délai livr.', 'Emballage', 'Commentaires']
-      : ['Ref', 'Code', 'Family', 'Description', 'Standard', 'Material', 'Finish', 'Dimensions', 'Length', 'Qty', 'Unit', 'Lead time', 'Notes', 'FOB Price', 'CFR Price', 'Delivery time', 'Packing', 'Comments'];
+    // Load template workbook
+    const templatePath = path.join(__dirname, 'templates', 'Matrice_consultation_fournisseurs.xlsx');
+    const templateWorkbook = new ExcelJS.Workbook();
+    await templateWorkbook.xlsx.readFile(templatePath);
+    const templateSheet = templateWorkbook.worksheets[0];
 
-    const keys = ['ref_client', 'code_article', 'famille', 'designation', 'norme', 'matiere', 'finish', 'dimensions', 'longueur_ml', 'quantite', 'unite', 'delai', 'notes'];
-    const editableColIndices = [13, 14, 15, 16, 17]; // Columns for FOB Price, CFR Price, Delivery time, Packing, Comments (0-indexed)
-
+    // Create new workbook and copy only rows 1-14 from template
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Demande');
 
-    // Header
-    worksheet.addRow(headers);
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1EFE8' } };
+    // Copy rows 1-14 from template exactly
+    for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
+      const templateRow = templateSheet.getRow(rowIdx);
+      const newRow = worksheet.addRow([]);
 
-    // Data rows
-    data.forEach((item, rowIdx) => {
-      const row = keys.map(key => item[key] || '');
-      // Add empty cells for editable columns
-      row.push('', '', '', '', '');
+      // Copy cell values and formatting
+      templateRow.eachCell((cell, colNumber) => {
+        const newCell = newRow.getCell(colNumber);
+        newCell.value = cell.value;
+
+        // Copy formatting
+        if (cell.font) newCell.font = Object.assign({}, cell.font);
+        if (cell.fill) newCell.fill = Object.assign({}, cell.fill);
+        if (cell.border) newCell.border = Object.assign({}, cell.border);
+        if (cell.alignment) newCell.alignment = Object.assign({}, cell.alignment);
+        if (cell.numFmt) newCell.numFmt = cell.numFmt;
+
+        newCell.locked = true; // Template rows are locked
+      });
+    }
+
+    // Copy column widths from template
+    for (let colIdx = 1; colIdx <= 17; colIdx++) {
+      const templateCol = templateSheet.getColumn(colIdx);
+      const newCol = worksheet.getColumn(colIdx);
+      if (templateCol.width) newCol.width = templateCol.width;
+      if (templateCol.hidden) newCol.hidden = templateCol.hidden;
+    }
+    // The template already has the correct header structure in row 14
+    // Template columns: Ref(1), Code(2), Family(3), Description(4), Standard(5), Material(6), Finish(7),
+    //                  Dimensions(8), Length(9), Qty(10), Unit(11), FOB Price(12), CFR Price(13),
+    //                  Delivery time(14), Packing(15), Comments(16), Notes(17)
+
+    // Editable columns for supplier: FOB Price(12), CFR Price(13), Delivery time(14), Packing(15), Comments(16)
+    const editableColIndices = [11, 12, 13, 14, 15]; // 0-indexed: cols 12-16
+
+    const keys = ['ref_client', 'code_article', 'famille', 'designation', 'norme', 'matiere', 'finish', 'dimensions', 'longueur_ml', 'quantite', 'unite', 'delai', 'notes'];
+
+    // Data rows - append after row 14
+    data.forEach((item) => {
+      // Map extracted data to template columns
+      // Cols 1-11: ref_client through unite (11 columns)
+      // Col 12: empty (FOB Price - supplier fills)
+      // Col 13: empty (CFR Price - supplier fills)
+      // Col 14: delai (Delivery time)
+      // Col 15: empty (Packing - supplier fills)
+      // Col 16: empty (Comments - supplier fills)
+      // Col 17: notes
+
+      const row = [
+        item.ref_client || '',
+        item.code_article || '',
+        item.famille || '',
+        item.designation || '',
+        item.norme || '',
+        item.matiere || '',
+        item.finish || '',
+        item.dimensions || '',
+        item.longueur_ml || '',
+        item.quantite || '',
+        item.unite || '',
+        '', // FOB Price - empty for supplier
+        '', // CFR Price - empty for supplier
+        item.delai || '', // Delivery time
+        '', // Packing - empty for supplier
+        '', // Comments - empty for supplier
+        item.notes || '' // Notes
+      ];
 
       const worksheetRow = worksheet.addRow(row);
 
-      // Highlight empty cells in light pink (only for data columns, not editable ones)
+      // Apply formatting to new rows
       worksheetRow.eachCell((cell, colNumber) => {
         const colIdx = colNumber - 1;
 
-        // Yellow background for editable columns (supplier input)
+        // Yellow background for editable columns
         if (editableColIndices.includes(colIdx)) {
           cell.fill = {
             type: 'pattern',
@@ -468,19 +528,16 @@ app.post('/api/export-excel', async (req, res) => {
       });
     });
 
-    // Set column widths
-    const colWidths = [12, 12, 14, 20, 15, 15, 12, 15, 12, 10, 8, 12, 15, 12, 12, 12, 12, 15];
-    worksheet.columns.forEach((col, idx) => {
-      col.width = colWidths[idx] || 15;
-    });
+    // Protect rows 1-14 (template rows)
+    for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
+      const row = worksheet.getRow(rowIdx);
+      row.eachCell((cell) => {
+        cell.locked = true; // All cells in rows 1-14 are locked
+      });
+    }
 
-    // Hide first 3 columns (Ref, Code, Family)
-    worksheet.getColumn(1).hidden = true;
-    worksheet.getColumn(2).hidden = true;
-    worksheet.getColumn(3).hidden = true;
-
-    // Lock sheet with protection
-    worksheet.protect('', {
+    // Lock sheet with strict protection - only allow selecting unlocked cells
+    worksheet.protect('123', {
       sheet: true,
       content: true,
       objects: true,
@@ -495,8 +552,8 @@ app.post('/api/export-excel', async (req, res) => {
       sort: false,
       autoFilter: false,
       pivotTables: false,
-      selectLockedCells: true,
-      selectUnlockedCells: true
+      selectLockedCells: false,  // Forbid selecting locked cells
+      selectUnlockedCells: true   // Only allow selecting unlocked cells
     });
 
     // Generate Excel buffer
