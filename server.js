@@ -148,7 +148,6 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     console.log('=== ANTHROPIC API RESPONSE (TEXT EXTRACT) ===');
     console.log('Response status:', response.status);
 
-    // Find text block (handle thinking blocks)
     const textBlock = response.data.content.find(block => block.type === 'text');
     if (!textBlock || !textBlock.text) {
       console.error('No text in content blocks');
@@ -158,7 +157,6 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
 
-    // Extract JSON from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return res.status(400).json({ success: false, error: 'JSON non trouvé dans la réponse Claude' });
@@ -186,7 +184,6 @@ app.post('/api/extract-pdf', upload.single('file'), async (req, res) => {
 
     const language = req.body.language || 'FR';
 
-    // Parse PDF and extract text
     const pdfData = await pdfParse(req.file.buffer);
     const demand = pdfData.text;
 
@@ -245,7 +242,6 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     console.log('=== ANTHROPIC API RESPONSE (PDF EXTRACT) ===');
     console.log('Response status:', response.status);
 
-    // Find text block (handle thinking blocks)
     const textBlock = response.data.content.find(block => block.type === 'text');
     if (!textBlock || !textBlock.text) {
       console.error('No text in content blocks');
@@ -282,7 +278,6 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
 
     const language = req.body.language || 'FR';
 
-    // Parse Excel file and convert to text using ExcelJS
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
 
@@ -290,27 +285,22 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Aucune feuille trouvée dans le fichier Excel' });
     }
 
-    // Read ALL worksheets with robust cell access
     let demand = '';
     workbook.worksheets.forEach((worksheet, sheetIndex) => {
-      // Add sheet name as separator (except for first sheet)
       if (sheetIndex > 0) {
         demand += '\n--- Feuille: ' + worksheet.name + ' ---\n';
       }
 
-      // Iterate through rows using getRow() for better control
       for (let rowNum = 1; rowNum <= worksheet.rowCount; rowNum++) {
         const row = worksheet.getRow(rowNum);
         const rowData = [];
 
-        // Iterate through columns in this row
         for (let colNum = 1; colNum <= worksheet.columnCount; colNum++) {
           const cell = row.getCell(colNum);
           const cellValue = cell.value !== null && cell.value !== undefined ? String(cell.value).trim() : '';
           rowData.push(cellValue);
         }
 
-        // Join cells with tab and only add non-empty rows
         const rowStr = rowData.join('\t').trim();
         if (rowStr.length > 0) {
           demand += rowStr + '\n';
@@ -322,7 +312,6 @@ app.post('/api/extract-excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Pas de données trouvées dans le fichier Excel' });
     }
 
-    // Estimate tokens (1 token ≈ 4 characters)
     const estimatedTokens = Math.ceil(demand.length / 4);
     console.log(`Excel file token estimation: ${estimatedTokens} tokens`);
 
@@ -384,7 +373,6 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
     console.log('=== ANTHROPIC API RESPONSE (EXCEL EXTRACT) ===');
     console.log('Response status:', response.status);
 
-    // Find text block (handle thinking blocks)
     const textBlock = response.data.content.find(block => block.type === 'text');
     if (!textBlock || !textBlock.text) {
       console.error('No text in content blocks');
@@ -393,7 +381,6 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
 
     const content = textBlock.text;
     console.log('Extracted text content length:', content.length);
-    console.log('Response content (first 500 chars):', content.substring(0, 500));
 
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
@@ -410,11 +397,10 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
   }
 });
 
-// Export Excel
+// Export Excel - SIMPLE APPROACH: Copy template + add data rows
 app.post('/api/export-excel', async (req, res) => {
   try {
     const path = require('path');
-    const fs = require('fs');
     const { data, language } = req.body;
 
     if (!Array.isArray(data)) {
@@ -427,30 +413,30 @@ app.post('/api/export-excel', async (req, res) => {
     await templateWorkbook.xlsx.readFile(templatePath);
     const templateSheet = templateWorkbook.worksheets[0];
 
-    // Create new workbook and copy only rows 1-14 from template
+    // Create new workbook
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Demande');
 
-    // Copy rows 1-14 from template exactly
+    // Copy rows 1-14 from template EXACTLY (no modification)
     for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
       const templateRow = templateSheet.getRow(rowIdx);
       const newRow = worksheet.addRow([]);
 
-      // Copy cell values and formatting
+      // Copy everything: values, fonts, fills, borders, alignment, numFmt
       templateRow.eachCell((cell, colNumber) => {
         const newCell = newRow.getCell(colNumber);
         newCell.value = cell.value;
 
-        // Copy formatting
         if (cell.font) newCell.font = Object.assign({}, cell.font);
         if (cell.fill) newCell.fill = Object.assign({}, cell.fill);
         if (cell.border) newCell.border = Object.assign({}, cell.border);
         if (cell.alignment) newCell.alignment = Object.assign({}, cell.alignment);
         if (cell.numFmt) newCell.numFmt = cell.numFmt;
+        if (cell.protection) newCell.protection = Object.assign({}, cell.protection);
       });
     }
 
-    // Copy column widths from template
+    // Copy column widths
     for (let colIdx = 1; colIdx <= 17; colIdx++) {
       const templateCol = templateSheet.getColumn(colIdx);
       const newCol = worksheet.getColumn(colIdx);
@@ -458,34 +444,12 @@ app.post('/api/export-excel', async (req, res) => {
       if (templateCol.hidden) newCol.hidden = templateCol.hidden;
     }
 
-    // Apply protection to rows 1-14: unlock specific zones, lock the rest
-    const unlockedZones = [
-      { start: 5, end: 7, rows: [2, 3, 4] },     // E2:G4
-      { start: 5, end: 7, rows: [7, 8, 9, 10, 11, 12] }, // E7:G12
-      { start: 11, end: 16, rows: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12] } // K3:P12
-    ];
+    // Get template row 15 as structure reference
+    const templateRow15 = templateSheet.getRow(15);
 
-    for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
-      const row = worksheet.getRow(rowIdx);
-      row.eachCell((cell, colNumber) => {
-        let isUnlocked = false;
-
-        // Check if this cell is in an unlocked zone
-        for (const zone of unlockedZones) {
-          if (colNumber >= zone.start && colNumber <= zone.end && zone.rows.includes(rowIdx)) {
-            isUnlocked = true;
-            break;
-          }
-        }
-
-        cell.protection = { locked: !isUnlocked };
-      });
-    }
-
-    // Data rows - append after row 14
-    // Columns: A(1)-K(11) = locked, L(12)-P(16) = yellow & unlocked, Q(17) = locked
+    // Add data rows (starting at row 15)
     data.forEach((item) => {
-      const row = [
+      const rowValues = [
         item.ref_client || '',
         item.code_article || '',
         item.famille || '',
@@ -497,42 +461,42 @@ app.post('/api/export-excel', async (req, res) => {
         item.longueur_ml || '',
         item.quantite || '',
         item.unite || '',
-        '', // FOB Price (L/12) - supplier fills
-        '', // CFR Price (M/13) - supplier fills
+        '', // FOB Price (L/12)
+        '', // CFR Price (M/13)
         item.delai || '', // Delivery time (N/14)
-        '', // Packing (O/15) - supplier fills
-        '', // Comments (P/16) - supplier fills
+        '', // Packing (O/15)
+        '', // Comments (P/16)
         item.notes || '' // Notes (Q/17)
       ];
 
-      const worksheetRow = worksheet.addRow(row);
+      const newRow = worksheet.addRow(rowValues);
 
-      // Apply formatting and protection to data rows
-      worksheetRow.eachCell((cell, colNumber) => {
-        // Editable columns: L(12), M(13), N(14), O(15), P(16)
-        if (colNumber >= 12 && colNumber <= 16) {
-          // Yellow background for editable columns
+      // Copy formatting from template row 15 to this new row
+      templateRow15.eachCell((templateCell, colNumber) => {
+        const newCell = newRow.getCell(colNumber);
+
+        // Copy all formatting from template row
+        if (templateCell.font) newCell.font = Object.assign({}, templateCell.font);
+        if (templateCell.fill) newCell.fill = Object.assign({}, templateCell.fill);
+        if (templateCell.border) newCell.border = Object.assign({}, templateCell.border);
+        if (templateCell.alignment) newCell.alignment = Object.assign({}, templateCell.alignment);
+        if (templateCell.numFmt) newCell.numFmt = templateCell.numFmt;
+        if (templateCell.protection) newCell.protection = Object.assign({}, templateCell.protection);
+      });
+
+      // Add rose color to empty cells ONLY
+      newRow.eachCell((cell, colNumber) => {
+        if ((!cell.value || cell.value === '') && (colNumber < 12 || colNumber > 16)) {
+          // Empty cell that's NOT in editable columns (L-P)
           cell.fill = {
             type: 'solid',
-            fgColor: { rgb: 'FFFF00' } // Yellow
+            fgColor: { rgb: 'FFC7CE' } // Light pink/rose
           };
-          cell.protection = { locked: false }; // Unlock for supplier
-        } else {
-          // Locked columns
-          cell.protection = { locked: true };
-
-          // Rose background for empty cells
-          if (!cell.value || cell.value === '') {
-            cell.fill = {
-              type: 'solid',
-              fgColor: { rgb: 'FFC7CE' } // Light pink/rose
-            };
-          }
         }
       });
     });
 
-    // Lock sheet with strict protection
+    // Apply protection to the entire sheet
     worksheet.protect('123', {
       sheet: true,
       content: true,
