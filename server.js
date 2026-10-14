@@ -501,29 +501,16 @@ app.post('/api/export-excel', async (req, res) => {
 
       const worksheetRow = worksheet.addRow(row);
 
-      // Apply formatting to new rows
-      worksheetRow.eachCell((cell, colNumber) => {
-        const colIdx = colNumber - 1;
-
-        // Yellow background for editable columns
-        if (editableColIndices.includes(colIdx)) {
-          cell.fill = {
-            type: 'solid',
-            fgColor: { rgb: 'FFFF00' } // Yellow
-          };
-          cell.protection = { locked: false }; // Unlock for supplier
-        } else {
-          // Light pink for empty data cells
-          if (!cell.value || cell.value === '') {
-            cell.fill = {
-              type: 'solid',
-              fgColor: { rgb: 'FFC7CE' } // Light pink
-            };
-          }
-          cell.protection = { locked: true }; // Lock for protection
-        }
-      });
-    });
+   // Apply protection only - no formatting
+worksheetRow.eachCell((cell, colNumber) => {
+  const colIdx = colNumber - 1;
+  
+  if (editableColIndices.includes(colIdx)) {
+    cell.protection = { locked: false }; // Unlock for supplier only
+  } else {
+    cell.protection = { locked: true }; // Lock everything else
+  }
+});
 
     // Lock sheet with strict protection - only allow selecting unlocked cells
     worksheet.protect('123', {
