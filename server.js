@@ -417,6 +417,7 @@ app.post('/api/export-excel', async (req, res) => {
     // On ECRIT DANS ces lignes existantes (pas addRow, qui ecrirait apres la ligne 866).
     const FIRST_DATA_ROW = 15;
     const ROSE = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
+    const JAUNE = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
 
     data.forEach((item, i) => {
       const values = [
@@ -434,9 +435,12 @@ app.post('/api/export-excel', async (req, res) => {
         const hasValue = v !== undefined && v !== null && String(v).trim() !== '';
         if (hasValue) cell.value = v;
 
-        // Rose sur les cellules vides des colonnes non editables (A-K et Q)
-        if (!hasValue && (col < 12 || col > 16)) {
-          // copie du style pour ne pas modifier les autres cellules qui partagent le meme style
+        // copie du style pour ne pas modifier les autres cellules qui partagent le meme style
+        if (col >= 12 && col <= 16) {
+          // Jaune sur les colonnes editables L-P des lignes utilisees
+          cell.style = Object.assign({}, cell.style, { fill: JAUNE });
+        } else if (!hasValue) {
+          // Rose sur les cellules vides des colonnes non editables (A-K et Q)
           cell.style = Object.assign({}, cell.style, { fill: ROSE });
         }
       });
