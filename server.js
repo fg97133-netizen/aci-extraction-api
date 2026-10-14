@@ -458,18 +458,32 @@ app.post('/api/export-excel', async (req, res) => {
       if (templateCol.hidden) newCol.hidden = templateCol.hidden;
     }
 
-    // Lock all cells in rows 1-14 (template rows)
+    // Apply protection to rows 1-14: unlock specific zones, lock the rest
+    const unlockedZones = [
+      { start: 5, end: 7, rows: [2, 3, 4] },     // E2:G4
+      { start: 5, end: 7, rows: [7, 8, 9, 10, 11, 12] }, // E7:G12
+      { start: 11, end: 16, rows: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12] } // K3:P12
+    ];
+
     for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
       const row = worksheet.getRow(rowIdx);
-      row.eachCell((cell) => {
-        cell.protection = { locked: true };
+      row.eachCell((cell, colNumber) => {
+        let isUnlocked = false;
+
+        // Check if this cell is in an unlocked zone
+        for (const zone of unlockedZones) {
+          if (colNumber >= zone.start && colNumber <= zone.end && zone.rows.includes(rowIdx)) {
+            isUnlocked = true;
+            break;
+          }
+        }
+
+        cell.protection = { locked: !isUnlocked };
       });
     }
 
-    // Editable columns for supplier: FOB Price(12), CFR Price(13), Delivery time(14), Packing(15), Comments(16)
-    const editableColIndices = [11, 12, 13, 14, 15]; // 0-indexed: cols 12-16
-
     // Data rows - append after row 14
+    // Columns: A(1)-K(11) = locked, L(12)-P(16) = yellow & unlocked, Q(17) = locked
     data.forEach((item) => {
       const row = [
         item.ref_client || '',
@@ -483,24 +497,37 @@ app.post('/api/export-excel', async (req, res) => {
         item.longueur_ml || '',
         item.quantite || '',
         item.unite || '',
-        '', // FOB Price - empty for supplier
-        '', // CFR Price - empty for supplier
-        item.delai || '', // Delivery time
-        '', // Packing - empty for supplier
-        '', // Comments - empty for supplier
-        item.notes || '' // Notes
+        '', // FOB Price (L/12) - supplier fills
+        '', // CFR Price (M/13) - supplier fills
+        item.delai || '', // Delivery time (N/14)
+        '', // Packing (O/15) - supplier fills
+        '', // Comments (P/16) - supplier fills
+        item.notes || '' // Notes (Q/17)
       ];
 
       const worksheetRow = worksheet.addRow(row);
 
-      // Apply protection only - no formatting
+      // Apply formatting and protection to data rows
       worksheetRow.eachCell((cell, colNumber) => {
-        const colIdx = colNumber - 1;
-
-        if (editableColIndices.includes(colIdx)) {
-          cell.protection = { locked: false }; // Unlock for supplier only
+        // Editable columns: L(12), M(13), N(14), O(15), P(16)
+        if (colNumber >= 12 && colNumber <= 16) {
+          // Yellow background for editable columns
+          cell.fill = {
+            type: 'solid',
+            fgColor: { rgb: 'FFFF00' } // Yellow
+          };
+          cell.protection = { locked: false }; // Unlock for supplier
         } else {
-          cell.protection = { locked: true }; // Lock everything else
+          // Locked columns
+          cell.protection = { locked: true };
+
+          // Rose background for empty cells
+          if (!cell.value || cell.value === '') {
+            cell.fill = {
+              type: 'solid',
+              fgColor: { rgb: 'FFC7CE' } // Light pink/rose
+            };
+          }
         }
       });
     });
