@@ -413,59 +413,37 @@ app.post('/api/export-excel', async (req, res) => {
     await workbook.xlsx.readFile(templatePath);
     const worksheet = workbook.worksheets[0];
 
-    // Get template row 15 as structure reference for new rows
-    const templateRow15 = worksheet.getRow(15);
+    // Le template contient deja des lignes pre-formatees (15 a 866).
+    // On ECRIT DANS ces lignes existantes (pas addRow, qui ecrirait apres la ligne 866).
+    const FIRST_DATA_ROW = 15;
+    const ROSE = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
 
-    // Add data rows directly into the template (starting at row 15)
-    data.forEach((item) => {
-      const rowValues = [
-        item.ref_client || '',
-        item.code_article || '',
-        item.famille || '',
-        item.designation || '',
-        item.norme || '',
-        item.matiere || '',
-        item.finish || '',
-        item.dimensions || '',
-        item.longueur_ml || '',
-        item.quantite || '',
-        item.unite || '',
-        '', // FOB Price (L/12)
-        '', // CFR Price (M/13)
-        item.delai || '', // Delivery time (N/14)
-        '', // Packing (O/15)
-        '', // Comments (P/16)
-        item.notes || '' // Notes (Q/17)
+    data.forEach((item, i) => {
+      const values = [
+        item.ref_client, item.code_article, item.famille, item.designation,
+        item.norme, item.matiere, item.finish, item.dimensions,
+        item.longueur_ml, item.quantite, item.unite,
+        null, null, item.delai, null, null, // L-P : FOB, CFR, Delivery, Packing, Comments
+        item.notes
       ];
+      const row = worksheet.getRow(FIRST_DATA_ROW + i);
 
-      const newRow = worksheet.addRow(rowValues);
+      values.forEach((v, idx) => {
+        const col = idx + 1;
+        const cell = row.getCell(col);
+        const hasValue = v !== undefined && v !== null && String(v).trim() !== '';
+        if (hasValue) cell.value = v;
 
-      // Copy formatting from template row 15 to new row
-      templateRow15.eachCell((templateCell, colNumber) => {
-        const newCell = newRow.getCell(colNumber);
-
-        // Copy all formatting from template
-        if (templateCell.font) newCell.font = Object.assign({}, templateCell.font);
-        if (templateCell.fill) newCell.fill = Object.assign({}, templateCell.fill);
-        if (templateCell.border) newCell.border = Object.assign({}, templateCell.border);
-        if (templateCell.alignment) newCell.alignment = Object.assign({}, templateCell.alignment);
-        if (templateCell.numFmt) newCell.numFmt = templateCell.numFmt;
-        if (templateCell.protection) newCell.protection = Object.assign({}, templateCell.protection);
-      });
-
-      // Add rose color to empty cells ONLY (not in editable columns L-P)
-      newRow.eachCell((cell, colNumber) => {
-        if ((!cell.value || cell.value === '') && (colNumber < 12 || colNumber > 16)) {
-          cell.fill = {
-            type: 'solid',
-            fgColor: { rgb: 'FFC7CE' } // Light pink/rose
-          };
+        // Rose sur les cellules vides des colonnes non editables (A-K et Q)
+        if (!hasValue && (col < 12 || col > 16)) {
+          // copie du style pour ne pas modifier les autres cellules qui partagent le meme style
+          cell.style = Object.assign({}, cell.style, { fill: ROSE });
         }
       });
     });
 
     // Apply protection to the entire sheet
-    worksheet.protect('123', {
+    await worksheet.protect('123', {
       sheet: true,
       content: true,
       objects: true,
