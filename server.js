@@ -458,6 +458,14 @@ app.post('/api/export-excel', async (req, res) => {
       if (templateCol.hidden) newCol.hidden = templateCol.hidden;
     }
 
+    // Lock all cells in rows 1-14 (template rows)
+    for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
+      const row = worksheet.getRow(rowIdx);
+      row.eachCell((cell) => {
+        cell.protection = { locked: true };
+      });
+    }
+
     // Editable columns for supplier: FOB Price(12), CFR Price(13), Delivery time(14), Packing(15), Comments(16)
     const editableColIndices = [11, 12, 13, 14, 15]; // 0-indexed: cols 12-16
 
