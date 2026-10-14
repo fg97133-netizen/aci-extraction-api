@@ -447,7 +447,6 @@ app.post('/api/export-excel', async (req, res) => {
         if (cell.border) newCell.border = Object.assign({}, cell.border);
         if (cell.alignment) newCell.alignment = Object.assign({}, cell.alignment);
         if (cell.numFmt) newCell.numFmt = cell.numFmt;
-
       });
     }
 
@@ -458,27 +457,12 @@ app.post('/api/export-excel', async (req, res) => {
       if (templateCol.width) newCol.width = templateCol.width;
       if (templateCol.hidden) newCol.hidden = templateCol.hidden;
     }
-    // The template already has the correct header structure in row 14
-    // Template columns: Ref(1), Code(2), Family(3), Description(4), Standard(5), Material(6), Finish(7),
-    //                  Dimensions(8), Length(9), Qty(10), Unit(11), FOB Price(12), CFR Price(13),
-    //                  Delivery time(14), Packing(15), Comments(16), Notes(17)
 
     // Editable columns for supplier: FOB Price(12), CFR Price(13), Delivery time(14), Packing(15), Comments(16)
     const editableColIndices = [11, 12, 13, 14, 15]; // 0-indexed: cols 12-16
 
-    const keys = ['ref_client', 'code_article', 'famille', 'designation', 'norme', 'matiere', 'finish', 'dimensions', 'longueur_ml', 'quantite', 'unite', 'delai', 'notes'];
-
     // Data rows - append after row 14
     data.forEach((item) => {
-      // Map extracted data to template columns
-      // Cols 1-11: ref_client through unite (11 columns)
-      // Col 12: empty (FOB Price - supplier fills)
-      // Col 13: empty (CFR Price - supplier fills)
-      // Col 14: delai (Delivery time)
-      // Col 15: empty (Packing - supplier fills)
-      // Col 16: empty (Comments - supplier fills)
-      // Col 17: notes
-
       const row = [
         item.ref_client || '',
         item.code_article || '',
@@ -501,18 +485,19 @@ app.post('/api/export-excel', async (req, res) => {
 
       const worksheetRow = worksheet.addRow(row);
 
-   // Apply protection only - no formatting
-worksheetRow.eachCell((cell, colNumber) => {
-  const colIdx = colNumber - 1;
-  
-  if (editableColIndices.includes(colIdx)) {
-    cell.protection = { locked: false }; // Unlock for supplier only
-  } else {
-    cell.protection = { locked: true }; // Lock everything else
-  }
-});
+      // Apply protection only - no formatting
+      worksheetRow.eachCell((cell, colNumber) => {
+        const colIdx = colNumber - 1;
 
-    // Lock sheet with strict protection - only allow selecting unlocked cells
+        if (editableColIndices.includes(colIdx)) {
+          cell.protection = { locked: false }; // Unlock for supplier only
+        } else {
+          cell.protection = { locked: true }; // Lock everything else
+        }
+      });
+    });
+
+    // Lock sheet with strict protection
     worksheet.protect('123', {
       sheet: true,
       content: true,
@@ -528,8 +513,8 @@ worksheetRow.eachCell((cell, colNumber) => {
       sort: false,
       autoFilter: false,
       pivotTables: false,
-      selectLockedCells: false,  // Forbid selecting locked cells
-      selectUnlockedCells: true   // Only allow selecting unlocked cells
+      selectLockedCells: false,
+      selectUnlockedCells: true
     });
 
     // Generate Excel buffer
