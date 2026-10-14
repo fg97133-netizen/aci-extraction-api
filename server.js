@@ -397,7 +397,7 @@ ${language === 'EN' ? '\n[IMPORTANT: Traduis TOUS les champs texte en anglais - 
   }
 });
 
-// Export Excel - SIMPLE APPROACH: Copy template + add data rows
+// Export Excel - DIRECT APPROACH: Load template and add data rows DIRECTLY into it
 app.post('/api/export-excel', async (req, res) => {
   try {
     const path = require('path');
@@ -407,47 +407,16 @@ app.post('/api/export-excel', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Données invalides' });
     }
 
-    // Load template workbook
+    // Load template DIRECTLY (no copy, no new workbook)
     const templatePath = path.join(__dirname, 'templates', 'Matrice_consultation_fournisseurs.xlsx');
-    const templateWorkbook = new ExcelJS.Workbook();
-    await templateWorkbook.xlsx.readFile(templatePath);
-    const templateSheet = templateWorkbook.worksheets[0];
-
-    // Create new workbook
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Demande');
+    await workbook.xlsx.readFile(templatePath);
+    const worksheet = workbook.worksheets[0];
 
-    // Copy rows 1-14 from template EXACTLY (no modification)
-    for (let rowIdx = 1; rowIdx <= 14; rowIdx++) {
-      const templateRow = templateSheet.getRow(rowIdx);
-      const newRow = worksheet.addRow([]);
+    // Get template row 15 as structure reference for new rows
+    const templateRow15 = worksheet.getRow(15);
 
-      // Copy everything: values, fonts, fills, borders, alignment, numFmt
-      templateRow.eachCell((cell, colNumber) => {
-        const newCell = newRow.getCell(colNumber);
-        newCell.value = cell.value;
-
-        if (cell.font) newCell.font = Object.assign({}, cell.font);
-        if (cell.fill) newCell.fill = Object.assign({}, cell.fill);
-        if (cell.border) newCell.border = Object.assign({}, cell.border);
-        if (cell.alignment) newCell.alignment = Object.assign({}, cell.alignment);
-        if (cell.numFmt) newCell.numFmt = cell.numFmt;
-        if (cell.protection) newCell.protection = Object.assign({}, cell.protection);
-      });
-    }
-
-    // Copy column widths
-    for (let colIdx = 1; colIdx <= 17; colIdx++) {
-      const templateCol = templateSheet.getColumn(colIdx);
-      const newCol = worksheet.getColumn(colIdx);
-      if (templateCol.width) newCol.width = templateCol.width;
-      if (templateCol.hidden) newCol.hidden = templateCol.hidden;
-    }
-
-    // Get template row 15 as structure reference
-    const templateRow15 = templateSheet.getRow(15);
-
-    // Add data rows (starting at row 15)
+    // Add data rows directly into the template (starting at row 15)
     data.forEach((item) => {
       const rowValues = [
         item.ref_client || '',
@@ -471,11 +440,11 @@ app.post('/api/export-excel', async (req, res) => {
 
       const newRow = worksheet.addRow(rowValues);
 
-      // Copy formatting from template row 15 to this new row
+      // Copy formatting from template row 15 to new row
       templateRow15.eachCell((templateCell, colNumber) => {
         const newCell = newRow.getCell(colNumber);
 
-        // Copy all formatting from template row
+        // Copy all formatting from template
         if (templateCell.font) newCell.font = Object.assign({}, templateCell.font);
         if (templateCell.fill) newCell.fill = Object.assign({}, templateCell.fill);
         if (templateCell.border) newCell.border = Object.assign({}, templateCell.border);
@@ -484,10 +453,9 @@ app.post('/api/export-excel', async (req, res) => {
         if (templateCell.protection) newCell.protection = Object.assign({}, templateCell.protection);
       });
 
-      // Add rose color to empty cells ONLY
+      // Add rose color to empty cells ONLY (not in editable columns L-P)
       newRow.eachCell((cell, colNumber) => {
         if ((!cell.value || cell.value === '') && (colNumber < 12 || colNumber > 16)) {
-          // Empty cell that's NOT in editable columns (L-P)
           cell.fill = {
             type: 'solid',
             fgColor: { rgb: 'FFC7CE' } // Light pink/rose
