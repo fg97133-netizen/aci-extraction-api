@@ -428,12 +428,25 @@ app.post('/api/export-excel', async (req, res) => {
         item.notes
       ];
       const row = worksheet.getRow(FIRST_DATA_ROW + i);
+      let maxLines = 1;
 
       values.forEach((v, idx) => {
         const col = idx + 1;
         const cell = row.getCell(col);
         const hasValue = v !== undefined && v !== null && String(v).trim() !== '';
         if (hasValue) cell.value = v;
+
+        // Renvoi a la ligne automatique + texte aligne en haut
+        cell.alignment = Object.assign({}, cell.alignment, { wrapText: true, vertical: 'top' });
+
+        // Estimation du nombre de lignes necessaires pour lire tout le texte
+        const column = worksheet.getColumn(col);
+        if (hasValue && !column.hidden) {
+          const charsPerLine = Math.max(1, Math.floor((column.width || 10) * 1.1));
+          const lines = String(v).split('\n')
+            .reduce((n, part) => n + Math.max(1, Math.ceil(part.length / charsPerLine)), 0);
+          maxLines = Math.max(maxLines, lines);
+        }
 
         // copie du style pour ne pas modifier les autres cellules qui partagent le meme style
         if (col >= 12 && col <= 16) {
@@ -444,6 +457,9 @@ app.post('/api/export-excel', async (req, res) => {
           cell.style = Object.assign({}, cell.style, { fill: ROSE });
         }
       });
+
+      // Hauteur de ligne adaptee au contenu le plus long (15 points par ligne de texte)
+      row.height = maxLines * 15;
     });
 
     // Apply protection to the entire sheet
